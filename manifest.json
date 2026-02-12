@@ -1,0 +1,23 @@
+
+
+{
+  "manifest_version": 3,
+  "name": "AutoSense - Behavior-Driven Automation",
+  "version": "1.0.0",
+  "description": "Automatically detect and suggest automations based on your browsing patterns",
+  
+  "permissions": [
+    "tabs",
+    "storage",
+    "alarms"
+  ],
+  
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  
+  "background": {
+    "service_worker": "background/background.js",
+    "type": "module"
+  }
+}
