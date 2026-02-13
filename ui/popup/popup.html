@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoSense</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <div class="popup-header">
+      <div class="header-icon">🤖</div>
+      <div class="header-text">
+        <h1>AutoSense</h1>
+        <p>Behavior-Driven Automation</p>
+      </div>
+    </div>
+
+    <!-- Detected Patterns Section -->
+    <div class="section">
+      <h2>Detected Patterns</h2>
+      <div id="patterns-list" class="patterns-list">
+        <p class="loading">Loading patterns...</p>
+      </div>
+    </div>
+
+    <!-- Active Automations Section -->
+    <div class="section">
+      <h2>Active Automations</h2>
+      <div id="automations-list" class="automations-list">
+        <p class="loading">Loading automations...</p>
+      </div>
+    </div>
+
+    <!-- Footer Actions -->
+    <div class="popup-footer">
+      <button class="btn btn-primary" id="open-dashboard">
+        📊 View Dashboard
+      </button>
+      <button class="btn btn-secondary" id="clear-data">
+        🗑️ Clear All Data
+      </button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
