@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoSense Dashboard</title>
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <div class="header-icon">🤖</div>
+        <div class="header-content">
+          <h1>AutoSense Dashboard</h1>
+          <p class="header-subtitle">Intelligent Behavior-Driven Automation</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="search-container">
+          <input 
+            type="text" 
+            class="search-input" 
+            id="global-search" 
+            placeholder="Search automations, patterns, domains..."
+          >
+          <span class="search-icon">🔍</span>
+        </div>
+        <button class="header-btn btn-secondary" id="refresh-btn">
+          🔄 Refresh
+        </button>
+        <button class="header-btn btn-secondary" id="theme-toggle-btn">
+          🌙 Theme
+        </button>
+      </div>
+    </header>
+
+    <!-- Statistics Grid -->
+    <div class="stats-grid">
+      <div class="stat-card stat-card-automations">
+        <div class="stat-icon">⚡</div>
+        <div class="stat-info">
+          <span class="stat-label">Active Automations</span>
+          <span class="stat-value" id="stats-automations">0</span>
+        </div>
+        <div class="stat-trend">↑ Active</div>
+      </div>
+
+      <div class="stat-card stat-card-patterns">
+        <div class="stat-icon">🔍</div>
+        <div class="stat-info">
+          <span class="stat-label">Patterns Detected</span>
+          <span class="stat-value" id="stats-patterns">0</span>
+        </div>
+        <div class="stat-trend">📊 Analyzed</div>
+      </div>
+
+      <div class="stat-card stat-card-executions">
+        <div class="stat-icon">🎯</div>
+        <div class="stat-info">
+          <span class="stat-label">Total Executions</span>
+          <span class="stat-value" id="stats-executions">0</span>
+        </div>
+        <div class="stat-trend">✓ Completed</div>
+      </div>
+
+      <div class="stat-card stat-card-storage">
+        <div class="stat-icon">💾</div>
+        <div class="stat-info">
+          <span class="stat-label">Storage Used</span>
+          <span class="stat-value" id="stats-storage">0 KB</span>
+        </div>
+        <div class="stat-trend">📦 Data</div>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="content-grid">
+      
+      <!-- Automations Section -->
+      <section class="section section-full">
+        <div class="section-header">
+          <div class="section-title">
+            <span class="section-icon">⚡</span>
+            <h2>Active Automations</h2>
+          </div>
+          <div class="section-actions">
+            <select class="filter-select" id="category-filter">
+              <option value="all">All Categories</option>
+              <option value="WORK">💼 Work</option>
+              <option value="SOCIAL">👥 Social</option>
+              <option value="ENTERTAINMENT">🎬 Entertainment</option>
+              <option value="SHOPPING">🛒 Shopping</option>
+              <option value="NEWS">📰 News</option>
+              <option value="EDUCATION">📚 Education</option>
+              <option value="FINANCE">💰 Finance</option>
+              <option value="HEALTH">🏥 Health</option>
+              <option value="TECH">💻 Tech</option>
+              <option value="OTHER">🔖 Other</option>
+            </select>
+            <button class="btn btn-primary" id="add-automation-btn">
+              <span class="btn-icon">➕</span>
+              Add Automation
+            </button>
+          </div>
+        </div>
+        <div class="content-list" id="automations-list">
+          <div class="loading">
+            <div class="loading-spinner"></div>
+            <p>Loading automations...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Patterns Section -->
+      <section class="section">
+        <div class="section-header">
+          <div class="section-title">
+            <span class="section-icon">🔍</span>
+            <h2>Detected Patterns</h2>
+          </div>
+          <div class="section-actions">
+            <button class="btn btn-secondary" id="analyze-patterns-btn">
+              <span class="btn-icon">🔄</span>
+              Analyze Now
+            </button>
+          </div>
+        </div>
+        <div class="content-list" id="patterns-list">
+          <div class="loading">
+            <div class="loading-spinner"></div>
+            <p>Loading patterns...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Recent Activity Section -->
+      <section class="section">
+        <div class="section-header">
+          <div class="section-title">
+            <span class="section-icon">📜</span>
+            <h2>Recent Activity</h2>
+          </div>
+          <div class="section-actions">
+            <select class="filter-select" id="activity-filter">
+              <option value="all">All Events</option>
+              <option value="tab_updated">Page Visits</option>
+              <option value="tab_created">New Tabs</option>
+            </select>
+          </div>
+        </div>
+        <div class="activity-list" id="activity-list">
+          <div class="loading">
+            <div class="loading-spinner"></div>
+            <p>Loading activity...</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-content">
+        <span class="footer-text">AutoSense v2.0.0 - Smart Tab Automation</span>
+        <div class="footer-links">
+          <button class="footer-btn" id="open-sidepanel-btn">Open Side Panel</button>
+          <button class="footer-btn" id="export-data-btn">Export Data</button>
+          <button class="footer-btn footer-btn-danger" id="clear-all-data-btn">Clear All Data</button>
+        </div>
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script type="module" src="dashboard.js"></script>
+</body>
+</html>
