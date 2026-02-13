@@ -1,6 +1,81 @@
-// ===== UTILITY HELPER FUNCTIONS =====
+// ===== AUTOSENSE UTILITY HELPERS =====
 
-const Utils = {
+export const Utils = {
+  /**
+   * Sanitize and normalize domain
+   */
+  normalizeDomain(url) {
+    if (!url) return '';
+    
+    try {
+      let domain = url;
+      
+      // If it's a full URL, extract hostname
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        const urlObj = new URL(url);
+        domain = urlObj.hostname;
+      }
+      
+      // Remove www. prefix
+      if (domain.startsWith('www.')) {
+        domain = domain.substring(4);
+      }
+      
+      return domain.toLowerCase().trim();
+    } catch (e) {
+      return url.toLowerCase().trim();
+    }
+  },
+
+  /**
+   * Extract domain from URL
+   */
+  extractDomain(url) {
+    try {
+      const urlObj = new URL(url);
+      let hostname = urlObj.hostname;
+      
+      if (hostname.startsWith('www.')) {
+        hostname = hostname.substring(4);
+      }
+      
+      return hostname.toLowerCase();
+    } catch (e) {
+      return '';
+    }
+  },
+
+  /**
+   * Sanitize URL for privacy
+   */
+  sanitizeUrl(url) {
+    try {
+      const urlObj = new URL(url);
+      return `${urlObj.protocol}//${urlObj.hostname}${urlObj.pathname}`;
+    } catch (e) {
+      return url;
+    }
+  },
+
+  /**
+   * Input sanitization for XSS prevention
+   */
+  sanitizeInput(input) {
+    if (typeof input !== 'string') return '';
+    
+    const div = document.createElement('div');
+    div.textContent = input;
+    return div.innerHTML;
+  },
+
+  /**
+   * Validate domain format
+   */
+  isValidDomain(domain) {
+    const domainRegex = /^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}$/i;
+    return domainRegex.test(domain);
+  },
+
   /**
    * Format timestamp to readable date
    */
@@ -9,12 +84,14 @@ const Utils = {
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     });
   },
 
   /**
-   * Format timestamp to "time ago" format
+   * Format timestamp to "time ago"
    */
   formatTimeAgo(timestamp) {
     const now = Date.now();
@@ -24,64 +101,11 @@ const Utils = {
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
-    const weeks = Math.floor(days / 7);
-    const months = Math.floor(days / 30);
-    const years = Math.floor(days / 365);
 
     if (seconds < 60) return 'Just now';
-    if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
-    if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
-    if (days < 7) return `${days} day${days > 1 ? 's' : ''} ago`;
-    if (weeks < 4) return `${weeks} week${weeks > 1 ? 's' : ''} ago`;
-    if (months < 12) return `${months} month${months > 1 ? 's' : ''} ago`;
-    return `${years} year${years > 1 ? 's' : ''} ago`;
-  },
-
-  /**
-   * Count occurrences of domains in events
-   */
-  countDomains(events) {
-    const counts = {};
-    
-    events.forEach(event => {
-      if (event.domain) {
-        counts[event.domain] = (counts[event.domain] || 0) + 1;
-      }
-    });
-
-    return counts;
-  },
-
-  /**
-   * Group events by day
-   */
-  groupEventsByDay(events) {
-    const grouped = {};
-
-    events.forEach(event => {
-      const date = new Date(event.timestamp);
-      const dateKey = date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric'
-      });
-
-      grouped[dateKey] = (grouped[dateKey] || 0) + 1;
-    });
-
-    // Convert to array and sort by date
-    return Object.entries(grouped)
-      .map(([date, count]) => ({ date, count }))
-      .slice(-7) // Last 7 days
-      .reverse();
-  },
-
-  /**
-   * Sanitize HTML to prevent XSS
-   */
-  escapeHTML(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    return `${days}d ago`;
   },
 
   /**
@@ -89,6 +113,31 @@ const Utils = {
    */
   generateId() {
     return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  },
+
+  /**
+   * Calculate confidence score
+   */
+  calculateConfidence(occurrences, consistency) {
+    const frequencyScore = Math.min(occurrences / 10, 1);
+    return (frequencyScore * 0.6 + consistency * 0.4).toFixed(2);
+  },
+
+  /**
+   * Escape HTML to prevent XSS
+   */
+  escapeHTML(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  },
+
+  /**
+   * Deep clone object
+   */
+  deepClone(obj) {
+    return JSON.parse(JSON.stringify(obj));
   },
 
   /**
@@ -107,164 +156,49 @@ const Utils = {
   },
 
   /**
-   * Throttle function
+   * Get category by domain
    */
-  throttle(func, limit) {
-    let inThrottle;
-    return function(...args) {
-      if (!inThrottle) {
-        func.apply(this, args);
-        inThrottle = true;
-        setTimeout(() => inThrottle = false, limit);
-      }
-    };
-  },
-
-  /**
-   * Deep clone object
-   */
-  deepClone(obj) {
-    return JSON.parse(JSON.stringify(obj));
-  },
-
-  /**
-   * Calculate percentage
-   */
-  calculatePercentage(value, total) {
-    if (total === 0) return 0;
-    return Math.round((value / total) * 100);
-  },
-
-  /**
-   * Format bytes to human readable size
-   */
-  formatBytes(bytes, decimals = 2) {
-    if (bytes === 0) return '0 Bytes';
-
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
-  },
-
-  /**
-   * Validate URL
-   */
-  isValidURL(string) {
-    try {
-      new URL(string);
-      return true;
-    } catch (_) {
-      return false;
-    }
-  },
-
-  /**
-   * Extract domain from URL
-   */
-  extractDomain(url) {
-    try {
-      const urlObj = new URL(url);
-      return urlObj.hostname;
-    } catch (_) {
-      return '';
-    }
-  },
-
-  /**
-   * Get favicon URL for domain
-   */
-  getFaviconURL(domain) {
-    return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
-  },
-
-  /**
-   * Sort array of objects by key
-   */
-  sortByKey(array, key, ascending = true) {
-    return array.sort((a, b) => {
-      const valA = a[key];
-      const valB = b[key];
-      
-      if (valA < valB) return ascending ? -1 : 1;
-      if (valA > valB) return ascending ? 1 : -1;
-      return 0;
-    });
-  },
-
-  /**
-   * Check if date is today
-   */
-  isToday(timestamp) {
-    const date = new Date(timestamp);
-    const today = new Date();
+  getCategoryByDomain(domain) {
+    const lowerDomain = domain.toLowerCase();
     
-    return date.getDate() === today.getDate() &&
-           date.getMonth() === today.getMonth() &&
-           date.getFullYear() === today.getFullYear();
-  },
-
-  /**
-   * Get time of day greeting
-   */
-  getGreeting() {
-    const hour = new Date().getHours();
-    
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
-  },
-
-  /**
-   * Local storage helpers
-   */
-  storage: {
-    set(key, value) {
-      try {
-        localStorage.setItem(key, JSON.stringify(value));
-        return true;
-      } catch (error) {
-        console.error('Storage set error:', error);
-        return false;
-      }
-    },
-
-    get(key) {
-      try {
-        const item = localStorage.getItem(key);
-        return item ? JSON.parse(item) : null;
-      } catch (error) {
-        console.error('Storage get error:', error);
-        return null;
-      }
-    },
-
-    remove(key) {
-      try {
-        localStorage.removeItem(key);
-        return true;
-      } catch (error) {
-        console.error('Storage remove error:', error);
-        return false;
-      }
-    },
-
-    clear() {
-      try {
-        localStorage.clear();
-        return true;
-      } catch (error) {
-        console.error('Storage clear error:', error);
-        return false;
-      }
+    // Work domains
+    if (lowerDomain.includes('slack') || lowerDomain.includes('teams') || 
+        lowerDomain.includes('zoom') || lowerDomain.includes('meet')) {
+      return 'WORK';
     }
+    
+    // Social domains
+    if (lowerDomain.includes('facebook') || lowerDomain.includes('twitter') || 
+        lowerDomain.includes('instagram') || lowerDomain.includes('linkedin')) {
+      return 'SOCIAL';
+    }
+    
+    // Entertainment
+    if (lowerDomain.includes('youtube') || lowerDomain.includes('netflix') || 
+        lowerDomain.includes('spotify') || lowerDomain.includes('twitch')) {
+      return 'ENTERTAINMENT';
+    }
+    
+    // Shopping
+    if (lowerDomain.includes('amazon') || lowerDomain.includes('ebay') || 
+        lowerDomain.includes('shop') || lowerDomain.includes('store')) {
+      return 'SHOPPING';
+    }
+    
+    // News
+    if (lowerDomain.includes('news') || lowerDomain.includes('cnn') || 
+        lowerDomain.includes('bbc') || lowerDomain.includes('nytimes')) {
+      return 'NEWS';
+    }
+    
+    // Education
+    if (lowerDomain.includes('edu') || lowerDomain.includes('coursera') || 
+        lowerDomain.includes('udemy') || lowerDomain.includes('khan')) {
+      return 'EDUCATION';
+    }
+    
+    return 'OTHER';
   }
 };
 
-// Export for use in other scripts
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = Utils;
-}
+export default Utils;

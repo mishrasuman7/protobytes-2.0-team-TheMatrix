@@ -1,19 +1,19 @@
-// ===== AUTOSENSE DASHBOARD - ENHANCED =====
+// ===== AUTOSENSE SIDEPANEL - ENHANCED =====
 
-import CONSTANTS from '../../utils/constants.js';
-import Utils from '../../utils/helpers.js';
+import CONSTANTS from '../utils/constants.js';
+import Utils from '../utils/helpers.js';
 
-console.log('[Dashboard] Loading...');
+console.log('[Sidepanel] Loading...');
 
 // State
-let currentCategoryFilter = 'all';
-let currentActivityFilter = 'all';
+let currentTab = 'automations';
+let currentFilter = 'all';
 let searchQuery = '';
 let darkMode = false;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
-  console.log('[Dashboard] Initializing...');
+  console.log('[Sidepanel] Initializing...');
   
   // Load saved theme
   const savedTheme = localStorage.getItem('autosense_theme');
@@ -21,50 +21,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     enableDarkMode();
   }
   
-  // Load all data
+  // Load data
   await loadStats();
   await loadAutomations();
   await loadPatterns();
-  await loadActivity();
+  await loadWhitelist();
+  await loadSettings();
   
   // Setup event listeners
   setupEventListeners();
   
-  console.log('[Dashboard] Ready! 🚀');
+  console.log('[Sidepanel] Ready! 🚀');
 });
 
 // ===== EVENT LISTENERS =====
 
 function setupEventListeners() {
-  // Global search
-  const globalSearch = document.getElementById('global-search');
-  if (globalSearch) {
-    globalSearch.addEventListener('input', Utils.debounce(handleGlobalSearch, 300));
-  }
-  
-  // Refresh button
-  document.getElementById('refresh-btn')?.addEventListener('click', async () => {
-    showToast('Refreshing data...', 'info');
-    await loadStats();
-    await loadAutomations();
-    await loadPatterns();
-    await loadActivity();
-    showToast('Data refreshed successfully!', 'success');
+  // Navigation tabs
+  document.querySelectorAll('.nav-tab').forEach(tab => {
+    tab.addEventListener('click', (e) => {
+      switchTab(e.currentTarget.dataset.tab);
+    });
   });
   
   // Theme toggle
-  document.getElementById('theme-toggle-btn')?.addEventListener('click', toggleTheme);
+  document.getElementById('theme-toggle')?.addEventListener('click', toggleTheme);
+  
+  // Search
+  const searchInput = document.getElementById('search-input');
+  if (searchInput) {
+    searchInput.addEventListener('input', Utils.debounce(handleSearch, 300));
+  }
   
   // Category filter
   document.getElementById('category-filter')?.addEventListener('change', (e) => {
-    currentCategoryFilter = e.target.value;
+    currentFilter = e.target.value;
     loadAutomations();
-  });
-  
-  // Activity filter
-  document.getElementById('activity-filter')?.addEventListener('change', (e) => {
-    currentActivityFilter = e.target.value;
-    loadActivity();
   });
   
   // Add automation
@@ -73,10 +65,42 @@ function setupEventListeners() {
   // Analyze patterns
   document.getElementById('analyze-patterns-btn')?.addEventListener('click', analyzePatterns);
   
-  // Footer actions
-  document.getElementById('open-sidepanel-btn')?.addEventListener('click', openSidePanel);
+  // Whitelist
+  document.getElementById('add-whitelist-btn')?.addEventListener('click', addToWhitelist);
+  
+  // Settings
+  document.getElementById('setting-notifications')?.addEventListener('change', saveSettings);
+  document.getElementById('setting-auto-execute')?.addEventListener('change', saveSettings);
+  document.getElementById('setting-pattern-detection')?.addEventListener('change', saveSettings);
+  document.getElementById('setting-show-toasts')?.addEventListener('change', saveSettings);
+  
+  // Data management
   document.getElementById('export-data-btn')?.addEventListener('click', exportData);
-  document.getElementById('clear-all-data-btn')?.addEventListener('click', clearAllData);
+  document.getElementById('import-data-btn')?.addEventListener('click', importData);
+  document.getElementById('clear-all-btn')?.addEventListener('click', clearAllData);
+  
+  // Open dashboard
+  document.getElementById('open-dashboard-btn')?.addEventListener('click', openDashboard);
+}
+
+// ===== TAB SWITCHING =====
+
+function switchTab(tabName) {
+  currentTab = tabName;
+  
+  // Update nav tabs
+  document.querySelectorAll('.nav-tab').forEach(tab => {
+    tab.classList.remove('active');
+  });
+  document.querySelector(`[data-tab="${tabName}"]`)?.classList.add('active');
+  
+  // Update content
+  document.querySelectorAll('.tab-content').forEach(content => {
+    content.classList.remove('active');
+  });
+  document.getElementById(`${tabName}-tab`)?.classList.add('active');
+  
+  console.log('[Sidepanel] Switched to tab:', tabName);
 }
 
 // ===== THEME =====
@@ -91,34 +115,30 @@ function toggleTheme() {
 
 function enableDarkMode() {
   document.body.classList.add('dark-mode');
-  document.getElementById('theme-toggle-btn').innerHTML = '☀️ Light';
+  document.getElementById('theme-toggle').innerHTML = '<span class="theme-icon">☀️</span>';
   darkMode = true;
   localStorage.setItem('autosense_theme', 'dark');
-  showToast('Dark mode enabled', 'info');
 }
 
 function disableDarkMode() {
   document.body.classList.remove('dark-mode');
-  document.getElementById('theme-toggle-btn').innerHTML = '🌙 Dark';
+  document.getElementById('theme-toggle').innerHTML = '<span class="theme-icon">🌙</span>';
   darkMode = false;
   localStorage.setItem('autosense_theme', 'light');
-  showToast('Light mode enabled', 'info');
 }
 
-// ===== GLOBAL SEARCH =====
+// ===== SEARCH =====
 
-async function handleGlobalSearch(e) {
+async function handleSearch(e) {
   searchQuery = e.target.value.toLowerCase().trim();
   
   if (!searchQuery) {
     await loadAutomations();
     await loadPatterns();
-    await loadActivity();
     return;
   }
   
-  console.log('[Dashboard] Searching for:', searchQuery);
-  showToast('Searching...', 'info');
+  console.log('[Sidepanel] Searching for:', searchQuery);
   
   const response = await chrome.runtime.sendMessage({
     type: 'SEARCH',
@@ -127,7 +147,6 @@ async function handleGlobalSearch(e) {
   
   if (response.success) {
     displaySearchResults(response.results);
-    showToast(`Found ${response.results.automations.length + response.results.patterns.length} results`, 'success');
   }
 }
 
@@ -155,18 +174,6 @@ function displaySearchResults(results) {
       });
     }
   }
-  
-  const activityList = document.getElementById('activity-list');
-  if (activityList && results.events) {
-    if (results.events.length === 0) {
-      activityList.innerHTML = createEmptyState('No activity found', 'Try a different search term');
-    } else {
-      activityList.innerHTML = '';
-      results.events.forEach(event => {
-        activityList.appendChild(createActivityItem(event));
-      });
-    }
-  }
 }
 
 // ===== LOAD STATS =====
@@ -177,33 +184,15 @@ async function loadStats() {
   if (response.success) {
     const stats = response.stats;
     
-    animateValue('stats-automations', 0, stats.activeAutomationsCount, 800);
-    animateValue('stats-patterns', 0, stats.patternsCount, 800);
-    animateValue('stats-executions', 0, stats.totalExecutions, 800);
+    document.getElementById('stat-automations').textContent = stats.activeAutomationsCount;
+    document.getElementById('stat-executions').textContent = stats.totalExecutions;
+    document.getElementById('stat-patterns').textContent = stats.patternsCount;
     
     const sizeKB = (stats.storageSize / 1024).toFixed(2);
-    document.getElementById('stats-storage').textContent = `${sizeKB} KB`;
+    document.getElementById('storage-used').textContent = `${sizeKB} KB / 5 MB`;
     
-    console.log('[Dashboard] Stats loaded:', stats);
+    console.log('[Sidepanel] Stats loaded:', stats);
   }
-}
-
-function animateValue(id, start, end, duration) {
-  const element = document.getElementById(id);
-  if (!element) return;
-  
-  const range = end - start;
-  const increment = range / (duration / 16);
-  let current = start;
-  
-  const timer = setInterval(() => {
-    current += increment;
-    if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
-      current = end;
-      clearInterval(timer);
-    }
-    element.textContent = Math.floor(current);
-  }, 16);
 }
 
 // ===== LOAD AUTOMATIONS =====
@@ -212,7 +201,7 @@ async function loadAutomations() {
   const automationsList = document.getElementById('automations-list');
   if (!automationsList) return;
   
-  automationsList.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Loading automations...</p></div>';
+  automationsList.innerHTML = '<div class="loading">Loading automations...</div>';
   
   const response = await chrome.runtime.sendMessage({ type: 'GET_AUTOMATIONS' });
   
@@ -223,14 +212,14 @@ async function loadAutomations() {
   
   let automations = response.automations;
   
-  if (currentCategoryFilter !== 'all') {
-    automations = automations.filter(a => a.category === currentCategoryFilter);
+  if (currentFilter !== 'all') {
+    automations = automations.filter(a => a.category === currentFilter);
   }
   
   if (automations.length === 0) {
     automationsList.innerHTML = createEmptyState(
-      '🎯 No automations yet',
-      'Start by creating automations from detected patterns or add manual ones'
+      'No automations yet',
+      'Create patterns from detected browsing behavior or add manual automations'
     );
     return;
   }
@@ -243,13 +232,11 @@ async function loadAutomations() {
   
   automationsList.innerHTML = '';
   
-  automations.forEach((automation, index) => {
-    const card = createAutomationCard(automation);
-    card.style.animationDelay = `${index * 0.05}s`;
-    automationsList.appendChild(card);
+  automations.forEach(automation => {
+    automationsList.appendChild(createAutomationCard(automation));
   });
   
-  console.log('[Dashboard] Loaded', automations.length, 'automations');
+  console.log('[Sidepanel] Loaded', automations.length, 'automations');
 }
 
 // 🆕 CREATE AUTOMATION CARD (Multi-tab support)
@@ -257,7 +244,6 @@ function createAutomationCard(automation) {
   const card = document.createElement('div');
   card.className = 'automation-card';
   card.id = `automation-${automation.id}`;
-  card.style.animation = 'fadeInUp 0.5s ease forwards';
   
   const category = CONSTANTS.CATEGORIES[automation.category] || CONSTANTS.CATEGORIES.OTHER;
   card.style.setProperty('--category-color', category.color);
@@ -270,7 +256,6 @@ function createAutomationCard(automation) {
     : 'Never used';
   
   const executionCount = automation.executionCount || 0;
-  const createdDate = Utils.formatDate(automation.createdAt);
   
   // 🆕 Handle multiple actions
   const actionDomains = automation.actions 
@@ -284,27 +269,22 @@ function createAutomationCard(automation) {
       <span class="flow-domain">${Utils.escapeHTML(actionDomains[0])}</span>
     `
     : `
-      <div style="display: flex; align-items: center; gap: 16px; width: 100%;">
-        <span class="flow-domain">${Utils.escapeHTML(automation.trigger.domain)}</span>
-        <span class="flow-arrow">→</span>
-        <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
-          ${actionDomains.map(domain => `
-            <div style="display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--bg-primary); border-radius: 8px;">
-              <span style="font-size: 14px;">🌐</span>
-              <span class="flow-domain" style="font-size: 13px;">${Utils.escapeHTML(domain)}</span>
-            </div>
-          `).join('')}
-        </div>
+      <span class="flow-domain">${Utils.escapeHTML(automation.trigger.domain)}</span>
+      <span class="flow-arrow">→</span>
+      <div class="flow-multi">
+        ${actionDomains.map(domain => `
+          <span class="flow-domain-small">🌐 ${Utils.escapeHTML(domain)}</span>
+        `).join('')}
       </div>
     `;
   
   card.innerHTML = `
     <div class="automation-header">
-      <div style="display: flex; align-items: center; gap: 12px;">
+      <div class="automation-title">
         <span class="automation-category" style="background: ${category.color}">
           ${category.icon} ${category.name}
         </span>
-        ${automation.isMultiTab ? '<span style="padding: 4px 10px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-radius: 12px; font-size: 10px; font-weight: 700;">MULTI-TAB</span>' : ''}
+        ${automation.isMultiTab ? '<span class="multi-tab-badge">Multi-Tab</span>' : ''}
       </div>
       <span class="automation-status ${statusClass}">${statusText}</span>
     </div>
@@ -314,34 +294,30 @@ function createAutomationCard(automation) {
     </div>
     
     <div class="automation-meta">
-      <span>⏱️ Last used: ${lastUsedText}</span>
-      <span>🎯 ${executionCount} executions</span>
-      <span>📅 Created: ${createdDate}</span>
+      <span class="meta-item">
+        <span>⏱️ ${lastUsedText}</span>
+      </span>
+      <span class="meta-item">
+        <span>🎯 ${executionCount} executions</span>
+      </span>
     </div>
     
     <div class="automation-actions">
-      <button class="btn btn-secondary" data-action="toggle" data-id="${automation.id}">
+      <button class="btn btn-secondary btn-toggle" data-id="${automation.id}">
         ${automation.active ? '⏸️ Pause' : '▶️ Resume'}
       </button>
-      <button class="btn btn-secondary" data-action="edit" data-id="${automation.id}">
+      <button class="btn btn-secondary btn-edit" data-id="${automation.id}">
         🔧 Edit
       </button>
-      <button class="btn btn-danger" data-action="delete" data-id="${automation.id}">
+      <button class="btn btn-danger btn-delete" data-id="${automation.id}">
         🗑️ Delete
       </button>
     </div>
   `;
   
-  card.querySelectorAll('[data-action]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const action = e.currentTarget.dataset.action;
-      const id = e.currentTarget.dataset.id;
-      
-      if (action === 'toggle') toggleAutomation(id);
-      else if (action === 'edit') editAutomation(automation);
-      else if (action === 'delete') deleteAutomation(id);
-    });
-  });
+  card.querySelector('.btn-toggle')?.addEventListener('click', () => toggleAutomation(automation.id));
+  card.querySelector('.btn-edit')?.addEventListener('click', () => editAutomation(automation));
+  card.querySelector('.btn-delete')?.addEventListener('click', () => deleteAutomation(automation.id));
   
   return card;
 }
@@ -355,11 +331,9 @@ async function toggleAutomation(automationId) {
   });
   
   if (response.success) {
-    showToast(response.active ? '✅ Automation activated' : '⏸️ Automation paused', 'success');
+    showToast(response.active ? 'Automation activated' : 'Automation paused', 'success');
     await loadAutomations();
     await loadStats();
-  } else {
-    showToast('❌ Failed to toggle automation', 'error');
   }
 }
 
@@ -403,15 +377,15 @@ async function editAutomation(automation) {
   });
   
   if (response.success) {
-    showToast('✅ Automation updated successfully', 'success');
+    showToast('Automation updated successfully', 'success');
     await loadAutomations();
   } else {
-    showToast('❌ Failed to update automation', 'error');
+    showToast('Failed to update automation', 'error');
   }
 }
 
 async function deleteAutomation(automationId) {
-  if (!confirm('Are you sure you want to delete this automation? This action cannot be undone.')) {
+  if (!confirm('Are you sure you want to delete this automation?')) {
     return;
   }
   
@@ -423,21 +397,13 @@ async function deleteAutomation(automationId) {
   if (response.success) {
     const card = document.getElementById(`automation-${automationId}`);
     if (card) {
-      card.style.animation = 'fadeOut 0.3s ease forwards';
-      setTimeout(() => {
-        card.remove();
-        
-        const list = document.getElementById('automations-list');
-        if (list && list.children.length === 0) {
-          loadAutomations();
-        }
-      }, 300);
+      card.style.opacity = '0';
+      card.style.transform = 'translateX(-20px)';
+      setTimeout(() => card.remove(), 300);
     }
     
-    showToast('🗑️ Automation deleted', 'success');
+    showToast('Automation deleted', 'success');
     await loadStats();
-  } else {
-    showToast('❌ Failed to delete automation', 'error');
   }
 }
 
@@ -474,7 +440,7 @@ async function addManualAutomation() {
     signature: `${Utils.normalizeDomain(trigger)} → ${actionsArray.map(a => Utils.normalizeDomain(a)).join(' → ')}`,
     description: actionsArray.length === 1
       ? `When you visit ${trigger}, you then open ${actionsArray[0]}`
-      : `When you visit ${trigger}, you then open ${actionsArray.join(' and ')}`,
+      : `When you visit ${trigger}, you then open ${actionsArray.join(', ')}`,
     occurrences: 1,
     confidence: '1.00',
     category: categoryKey,
@@ -499,12 +465,12 @@ async function addManualAutomation() {
     });
     
     if (automationResponse.success) {
-      showToast('✅ Manual automation created!', 'success');
+      showToast('Manual automation created!', 'success');
       await loadAutomations();
       await loadStats();
     }
   } else {
-    showToast('❌ Failed to create automation', 'error');
+    showToast('Failed to create automation', 'error');
   }
 }
 
@@ -514,7 +480,7 @@ async function loadPatterns() {
   const patternsList = document.getElementById('patterns-list');
   if (!patternsList) return;
   
-  patternsList.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Loading patterns...</p></div>';
+  patternsList.innerHTML = '<div class="loading">Loading patterns...</div>';
   
   const response = await chrome.runtime.sendMessage({ type: 'GET_PATTERNS' });
   
@@ -525,72 +491,59 @@ async function loadPatterns() {
   
   if (response.patterns.length === 0) {
     patternsList.innerHTML = createEmptyState(
-      '🔍 No patterns detected yet',
-      'Keep browsing and AutoSense will detect repeated patterns automatically'
+      'No patterns detected yet',
+      'Keep browsing and AutoSense will detect repeated patterns'
     );
     return;
   }
   
   patternsList.innerHTML = '';
   
-  response.patterns.forEach((pattern, index) => {
-    const card = createPatternCard(pattern);
-    card.style.animationDelay = `${index * 0.05}s`;
-    patternsList.appendChild(card);
+  response.patterns.forEach(pattern => {
+    patternsList.appendChild(createPatternCard(pattern));
   });
   
-  console.log('[Dashboard] Loaded', response.patterns.length, 'patterns');
+  console.log('[Sidepanel] Loaded', response.patterns.length, 'patterns');
 }
 
-// 🆕 CREATE PATTERN CARD (Multi-tab support)
+// ===== CREATE PATTERN CARD =====
+
 function createPatternCard(pattern) {
   const card = document.createElement('div');
   card.className = 'pattern-card';
   card.id = `pattern-${pattern.id}`;
-  card.style.animation = 'fadeInUp 0.5s ease forwards';
   
   const confidence = parseFloat(pattern.confidence) * 100;
   const confidenceClass = confidence >= 70 ? 'high' : confidence >= 50 ? 'medium' : 'low';
   
   // 🆕 Show multi-tab badge
   const multiTabBadge = pattern.isMultiTab 
-    ? '<span style="padding: 4px 10px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-radius: 12px; font-size: 10px; font-weight: 700; margin-left: 8px;">MULTI-TAB</span>' 
+    ? '<span class="multi-tab-badge-small">Multi-Tab</span>' 
     : '';
   
   card.innerHTML = `
-    <div class="pattern-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-      <div style="display: flex; align-items: center; gap: 12px;">
-        <span class="confidence-badge ${confidenceClass}">${confidence.toFixed(0)}% Confidence</span>
-        <span class="occurrences-badge" style="padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; background: rgba(33, 150, 243, 0.15); color: #2196f3;">
-          ${pattern.occurrences} occurrences
-        </span>
-        ${multiTabBadge}
-      </div>
+    <div class="pattern-header">
+      <span class="confidence-badge ${confidenceClass}">${confidence.toFixed(0)}% Confidence</span>
+      <span class="occurrences-badge">${pattern.occurrences} times</span>
+      ${multiTabBadge}
     </div>
     
     <div class="pattern-description">
       ${Utils.escapeHTML(pattern.description)}
     </div>
     
-    <div class="pattern-actions" style="display: flex; gap: 10px; margin-top: 16px;">
-      <button class="btn btn-primary" data-action="approve" data-id="${pattern.id}" style="flex: 1;">
+    <div class="pattern-actions">
+      <button class="btn btn-success btn-approve" data-id="${pattern.id}">
         ✓ Create Automation
       </button>
-      <button class="btn btn-secondary" data-action="dismiss" data-id="${pattern.id}" style="flex: 1;">
+      <button class="btn btn-secondary btn-dismiss" data-id="${pattern.id}">
         ✗ Dismiss
       </button>
     </div>
   `;
   
-  card.querySelectorAll('[data-action]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const action = e.currentTarget.dataset.action;
-      const id = e.currentTarget.dataset.id;
-      
-      if (action === 'approve') approvePattern(id);
-      else if (action === 'dismiss') dismissPattern(id);
-    });
-  });
+  card.querySelector('.btn-approve')?.addEventListener('click', () => approvePattern(pattern.id));
+  card.querySelector('.btn-dismiss')?.addEventListener('click', () => dismissPattern(pattern.id));
   
   return card;
 }
@@ -604,19 +557,17 @@ async function approvePattern(patternId) {
   });
   
   if (response.success) {
-    showToast('✅ Automation created!', 'success');
+    showToast('Automation created!', 'success');
     
     const card = document.getElementById(`pattern-${patternId}`);
     if (card) {
-      card.style.animation = 'fadeOut 0.3s ease forwards';
+      card.style.opacity = '0';
       setTimeout(() => card.remove(), 300);
     }
     
     await loadAutomations();
     await loadPatterns();
     await loadStats();
-  } else {
-    showToast('❌ Failed to create automation', 'error');
   }
 }
 
@@ -629,7 +580,7 @@ async function dismissPattern(patternId) {
   if (response.success) {
     const card = document.getElementById(`pattern-${patternId}`);
     if (card) {
-      card.style.animation = 'fadeOut 0.3s ease forwards';
+      card.style.opacity = '0';
       setTimeout(() => card.remove(), 300);
     }
     
@@ -639,101 +590,130 @@ async function dismissPattern(patternId) {
 }
 
 async function analyzePatterns() {
-  showToast('🔍 Analyzing patterns...', 'info');
+  showToast('Analyzing patterns...', 'info');
   
   const response = await chrome.runtime.sendMessage({ type: 'CHECK_PATTERNS' });
   
   if (response.success) {
     const patterns = response.patterns || [];
-    showToast(`✅ Found ${patterns.length} new patterns`, 'success');
+    showToast(`Found ${patterns.length} new patterns`, 'success');
     await loadPatterns();
     await loadStats();
-  } else {
-    showToast('❌ Failed to analyze patterns', 'error');
   }
 }
 
-// ===== LOAD ACTIVITY =====
+// ===== WHITELIST =====
 
-async function loadActivity() {
-  const activityList = document.getElementById('activity-list');
-  if (!activityList) return;
+async function loadWhitelist() {
+  const whitelistList = document.getElementById('whitelist-list');
+  if (!whitelistList) return;
   
-  activityList.innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Loading activity...</p></div>';
+  const response = await chrome.runtime.sendMessage({ type: 'GET_WHITELIST' });
   
-  const response = await chrome.runtime.sendMessage({ type: 'GET_EVENTS' });
-  
-  if (!response || !response.events) {
-    activityList.innerHTML = createEmptyState('Failed to load activity', 'Please refresh the page');
+  if (!response || !response.whitelist) {
+    whitelistList.innerHTML = createEmptyState('Failed to load whitelist', 'Please refresh');
     return;
   }
   
-  let events = response.events;
-  
-  if (currentActivityFilter !== 'all') {
-    events = events.filter(e => e.type === currentActivityFilter);
-  }
-  
-  if (events.length === 0) {
-    activityList.innerHTML = createEmptyState(
-      '📜 No activity yet',
-      'Start browsing to see your activity history'
+  if (response.whitelist.length === 0) {
+    whitelistList.innerHTML = createEmptyState(
+      'No whitelisted domains',
+      'Add domains to track patterns only from trusted sources'
     );
     return;
   }
   
-  const recentEvents = events.slice(-30).reverse();
+  whitelistList.innerHTML = '';
   
-  activityList.innerHTML = '';
-  
-  recentEvents.forEach((event, index) => {
-    const item = createActivityItem(event);
-    item.style.animationDelay = `${index * 0.03}s`;
-    activityList.appendChild(item);
+  response.whitelist.forEach(domain => {
+    const item = document.createElement('div');
+    item.className = 'whitelist-item';
+    item.innerHTML = `
+      <span class="whitelist-domain">${Utils.escapeHTML(domain)}</span>
+      <button class="whitelist-remove" data-domain="${Utils.escapeHTML(domain)}">Remove</button>
+    `;
+    
+    item.querySelector('.whitelist-remove')?.addEventListener('click', () => removeFromWhitelist(domain));
+    
+    whitelistList.appendChild(item);
   });
   
-  console.log('[Dashboard] Loaded', recentEvents.length, 'activity items');
+  console.log('[Sidepanel] Loaded', response.whitelist.length, 'whitelisted domains');
 }
 
-// ===== CREATE ACTIVITY ITEM =====
-
-function createActivityItem(event) {
-  const item = document.createElement('div');
-  item.className = 'activity-item';
-  item.style.animation = 'fadeIn 0.3s ease forwards';
+async function addToWhitelist() {
+  const input = document.getElementById('whitelist-input');
+  const domain = input.value.trim();
   
-  const iconMap = {
-    'tab_updated': '🌐',
-    'tab_created': '➕',
-    'tab_activated': '👆',
-    'manual_entry': '⌨️'
+  if (!domain) {
+    showToast('Please enter a domain', 'error');
+    return;
+  }
+  
+  const response = await chrome.runtime.sendMessage({
+    type: 'ADD_TO_WHITELIST',
+    domain
+  });
+  
+  if (response.success) {
+    showToast('Domain added to whitelist', 'success');
+    input.value = '';
+    await loadWhitelist();
+  } else {
+    showToast(response.error || 'Failed to add domain', 'error');
+  }
+}
+
+async function removeFromWhitelist(domain) {
+  const response = await chrome.runtime.sendMessage({
+    type: 'REMOVE_FROM_WHITELIST',
+    domain
+  });
+  
+  if (response.success) {
+    showToast('Domain removed from whitelist', 'success');
+    await loadWhitelist();
+  }
+}
+
+// ===== SETTINGS =====
+
+async function loadSettings() {
+  const response = await chrome.runtime.sendMessage({ type: 'GET_SETTINGS' });
+  
+  if (response && response.settings) {
+    const settings = response.settings;
+    
+    document.getElementById('setting-notifications').checked = settings.enableNotifications;
+    document.getElementById('setting-auto-execute').checked = settings.enableAutoExecution;
+    document.getElementById('setting-pattern-detection').checked = settings.patternDetectionEnabled;
+    document.getElementById('setting-show-toasts').checked = settings.showToasts;
+    
+    console.log('[Sidepanel] Settings loaded:', settings);
+  }
+}
+
+async function saveSettings() {
+  const settings = {
+    enableNotifications: document.getElementById('setting-notifications').checked,
+    enableAutoExecution: document.getElementById('setting-auto-execute').checked,
+    patternDetectionEnabled: document.getElementById('setting-pattern-detection').checked,
+    showToasts: document.getElementById('setting-show-toasts').checked
   };
   
-  const icon = iconMap[event.type] || '📄';
-  const timeAgo = Utils.formatTimeAgo(event.timestamp);
+  const response = await chrome.runtime.sendMessage({
+    type: 'UPDATE_SETTINGS',
+    settings
+  });
   
-  item.innerHTML = `
-    <div class="activity-icon">${icon}</div>
-    <div class="activity-details">
-      <div class="activity-domain">${Utils.escapeHTML(event.domain)}</div>
-      <div class="activity-url">${Utils.escapeHTML(event.url || 'Unknown URL')}</div>
-    </div>
-    <div class="activity-time">${timeAgo}</div>
-  `;
-  
-  return item;
+  if (response.success) {
+    showToast('Settings saved', 'success');
+  }
 }
 
-// ===== OTHER ACTIONS =====
-
-async function openSidePanel() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  chrome.sidePanel.open({ windowId: tab.windowId });
-}
+// ===== DATA MANAGEMENT =====
 
 async function exportData() {
-  showToast('📥 Exporting data...', 'info');
-  
   const [automations, patterns, events] = await Promise.all([
     chrome.runtime.sendMessage({ type: 'GET_AUTOMATIONS' }),
     chrome.runtime.sendMessage({ type: 'GET_PATTERNS' }),
@@ -741,7 +721,6 @@ async function exportData() {
   ]);
   
   const data = {
-    version: '2.0.0',
     automations: automations.automations || [],
     patterns: patterns.patterns || [],
     events: events.events || [],
@@ -757,33 +736,49 @@ async function exportData() {
   a.click();
   
   URL.revokeObjectURL(url);
-  showToast('✅ Data exported successfully', 'success');
+  showToast('Data exported successfully', 'success');
+}
+
+function importData() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/json';
+  
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      
+      if (!data.automations || !data.patterns) {
+        throw new Error('Invalid backup file');
+      }
+      
+      showToast('Import feature coming soon!', 'info');
+    } catch (error) {
+      showToast('Failed to import data: ' + error.message, 'error');
+    }
+  };
+  
+  input.click();
 }
 
 async function clearAllData() {
-  if (!confirm('⚠️ Are you sure you want to clear ALL data?\n\nThis will delete:\n• All automations\n• All patterns\n• All browsing history\n\nThis action CANNOT be undone!')) {
+  if (!confirm('Are you sure you want to clear ALL data? This cannot be undone!')) {
     return;
   }
-  
-  if (!confirm('Are you ABSOLUTELY sure? This is your last chance!')) {
-    return;
-  }
-  
-  showToast('🗑️ Clearing all data...', 'info');
   
   const response = await chrome.runtime.sendMessage({ type: 'CLEAR_DATA' });
   
   if (response.success) {
-    showToast('✅ All data cleared successfully', 'success');
+    showToast('All data cleared', 'success');
     
-    setTimeout(async () => {
-      await loadStats();
-      await loadAutomations();
-      await loadPatterns();
-      await loadActivity();
-    }, 500);
-  } else {
-    showToast('❌ Failed to clear data', 'error');
+    await loadStats();
+    await loadAutomations();
+    await loadPatterns();
+    await loadWhitelist();
   }
 }
 
@@ -806,41 +801,27 @@ function showToast(message, type = 'info') {
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
   
-  const iconMap = {
-    success: '✅',
-    error: '❌',
-    info: 'ℹ️',
-    warning: '⚠️'
-  };
-  
-  const icon = iconMap[type] || 'ℹ️';
+  const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
   
   toast.innerHTML = `
-    <span style="font-size: 20px;">${icon}</span>
+    <span class="toast-icon">${icon}</span>
     <span class="toast-message">${Utils.escapeHTML(message)}</span>
   `;
   
   container.appendChild(toast);
   
   setTimeout(() => {
-    toast.style.animation = 'slideOutRight 0.3s ease forwards';
+    toast.style.opacity = '0';
     setTimeout(() => toast.remove(), 300);
   }, 3000);
 }
 
-// Add fadeOut animation
-const style = document.createElement('style');
-style.textContent = `
-  @keyframes fadeOut {
-    from { opacity: 1; transform: translateX(0); }
-    to { opacity: 0; transform: translateX(-20px); }
-  }
-  
-  @keyframes slideOutRight {
-    from { transform: translateX(0); opacity: 1; }
-    to { transform: translateX(400px); opacity: 0; }
-  }
-`;
-document.head.appendChild(style);
+function openDashboard() {
+  const dashboardUrl = chrome.runtime.getURL('ui/dashboard/dashboard.html');
+  chrome.tabs.create({
+    url: dashboardUrl,
+    active: true
+  });
+}
 
-console.log('[Dashboard] Script loaded successfully! 🎨');
+console.log('[Sidepanel] Script loaded! 🎨');

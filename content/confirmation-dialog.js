@@ -1,654 +1,820 @@
-// ===== AUTOSENSE CONFIRMATION DIALOG =====
+// ===== AUTOSENSE CONFIRMATION DIALOG - ENHANCED =====
 
-console.log('[AutoSense Content] Script loaded');
+console.log('[AutoSense Content] ===== SCRIPT LOADED =====');
+console.log('[AutoSense Content] URL:', window.location.href);
 
-// Listen for messages from background script
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log('[AutoSense Content] Message received:', message.type);
-  
-  if (message.type === 'SHOW_PATTERN_CONFIRMATION') {
-    console.log('[AutoSense Content] Showing confirmation dialog:', message.pattern);
-    showConfirmationDialog(message.pattern);
-    sendResponse({ success: true });
-  } else if (message.type === 'SHOW_MULTI_PATTERN_SELECTION') {
-    console.log('[AutoSense Content] Showing multi-pattern selection:', message.patterns);
-    showMultiPatternDialog(message.triggerDomain, message.patterns);
-    sendResponse({ success: true });
-  } else if (message.type === 'SHOW_AUTOMATION_SELECTION') {
-    console.log('[AutoSense Content] Showing automation selection:', message.automations);
-    showAutomationSelectionDialog(message.triggerDomain, message.automations);
-    sendResponse({ success: true });
-  }
-  
-  return true;
-});
-
-// Show confirmation dialog
-function showConfirmationDialog(pattern) {
-  // Remove existing dialog if any
-  const existingDialog = document.getElementById('autosense-confirmation-dialog');
-  if (existingDialog) {
-    existingDialog.remove();
-  }
-  
-  // Create overlay
-  const overlay = document.createElement('div');
-  overlay.id = 'autosense-confirmation-dialog';
-  overlay.innerHTML = `
-    <div class="autosense-overlay">
-      <div class="autosense-dialog">
-        <div class="autosense-header">
-          <div class="autosense-icon">🤖</div>
-          <h2>AutoSense: Pattern Detected!</h2>
-        </div>
-        
-        <div class="autosense-content">
-          <div class="autosense-badge">
-            <span class="confidence">${(parseFloat(pattern.confidence) * 100).toFixed(0)}% Confidence</span>
-            <span class="occurrences">${pattern.occurrences} times</span>
-          </div>
-          
-          <p class="autosense-description">
-            ${escapeHTML(pattern.description)}
-          </p>
-          
-          <div class="autosense-flow">
-            <div class="flow-item">
-              <span class="flow-icon">🌐</span>
-              <span class="flow-text">${escapeHTML(pattern.events[0].domain)}</span>
-            </div>
-            <div class="flow-arrow">→</div>
-            <div class="flow-item">
-              <span class="flow-icon">🌐</span>
-              <span class="flow-text">${escapeHTML(pattern.events[1].domain)}</span>
-            </div>
-          </div>
-          
-          <p class="autosense-question">
-            Would you like to automate this pattern?
-          </p>
-        </div>
-        
-        <div class="autosense-actions">
-          <button class="autosense-btn autosense-btn-primary" id="autosense-automate-btn" data-pattern-id="${pattern.id}">
-            ✓ Yes, Automate This
-          </button>
-          <button class="autosense-btn autosense-btn-secondary" id="autosense-dismiss-btn" data-pattern-id="${pattern.id}">
-            ✗ No, Dismiss
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
-  
-  // Add styles
-  const style = document.createElement('style');
-  style.textContent = getDialogStyles();
-  overlay.appendChild(style);
-  document.body.appendChild(overlay);
-  
-  // Add event listeners
-  document.getElementById('autosense-automate-btn').addEventListener('click', function() {
-    const patternId = this.getAttribute('data-pattern-id');
-    console.log('[AutoSense Content] User clicked: Automate', patternId);
-    
-    try {
-      chrome.runtime.sendMessage({
-        type: 'APPROVE_AUTOMATION',
-        patternId: patternId
-      }, function(response) {
-        if (!chrome.runtime.lastError) {
-          showSuccessMessage('✅ Automation created successfully!');
-        }
-      });
-    } catch (err) {
-      console.log('[AutoSense Content] Send message error:', err);
-    }
-    
-    overlay.remove();
-  });
-  
-  document.getElementById('autosense-dismiss-btn').addEventListener('click', function() {
-    const patternId = this.getAttribute('data-pattern-id');
-    console.log('[AutoSense Content] User clicked: Dismiss', patternId);
-    
-    try {
-      chrome.runtime.sendMessage({
-        type: 'DISMISS_PATTERN',
-        patternId: patternId
-      });
-    } catch (err) {
-      console.log('[AutoSense Content] Send message error:', err);
-    }
-    
-    overlay.remove();
-  });
-  
-  overlay.querySelector('.autosense-overlay').addEventListener('click', function(e) {
-    if (e.target.classList.contains('autosense-overlay')) {
-      overlay.remove();
-    }
-  });
+// Prevent multiple injections
+if (window.autoSenseInjected) {
+  console.log('[AutoSense Content] Already injected, skipping...');
+} else {
+  window.autoSenseInjected = true;
+  console.log('[AutoSense Content] First injection, setting up...');
 }
 
-// Show multi-pattern selection dialog
-function showMultiPatternDialog(triggerDomain, patterns) {
-  const existingDialog = document.getElementById('autosense-confirmation-dialog');
-  if (existingDialog) {
-    existingDialog.remove();
+// ===== UTILITY FUNCTIONS =====
+
+function escapeHTML(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function removeExistingDialog() {
+  const existing = document.getElementById('autosense-confirmation-dialog');
+  if (existing) {
+    console.log('[AutoSense Content] Removing existing dialog');
+    existing.remove();
   }
-  
-  const overlay = document.createElement('div');
-  overlay.id = 'autosense-confirmation-dialog';
-  
-  const patternOptionsHTML = patterns.map((pattern, index) => `
-    <label class="pattern-option" for="pattern-${index}">
-      <input type="radio" name="pattern-selection" id="pattern-${index}" value="${escapeHTML(pattern.id)}" ${index === 0 ? 'checked' : ''}>
-      <div class="pattern-option-content">
-        <div class="pattern-option-header">
-          <span class="pattern-option-domain">${escapeHTML(pattern.events[1].domain)}</span>
-          <span class="pattern-option-badge">${pattern.occurrences} times</span>
-        </div>
-        <div class="pattern-option-desc">${escapeHTML(pattern.description)}</div>
-      </div>
-    </label>
-  `).join('');
-  
-  overlay.innerHTML = `
-    <div class="autosense-overlay">
-      <div class="autosense-dialog autosense-dialog-large">
-        <div class="autosense-header">
-          <div class="autosense-icon">🤖</div>
-          <h2>AutoSense: Multiple Patterns Detected!</h2>
-        </div>
-        
-        <div class="autosense-content">
-          <p class="autosense-description">
-            When you visit <strong>${escapeHTML(triggerDomain)}</strong>, you often open multiple sites.
-            <br>Choose which one you'd like to automate:
-          </p>
-          
-          <div class="pattern-options">
-            ${patternOptionsHTML}
-          </div>
-          
-          <div class="pattern-options-note">
-            💡 <strong>Tip:</strong> You can automate the others later from the dashboard!
-          </div>
-        </div>
-        
-        <div class="autosense-actions">
-          <button class="autosense-btn autosense-btn-primary" id="autosense-multi-automate-btn">
-            ✓ Automate Selected
-          </button>
-          <button class="autosense-btn autosense-btn-secondary" id="autosense-multi-dismiss-btn">
-            ✗ Dismiss All
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
-  
-  const style = document.createElement('style');
-  style.textContent = getDialogStyles();
-  overlay.appendChild(style);
-  document.body.appendChild(overlay);
-  
-  document.getElementById('autosense-multi-automate-btn').addEventListener('click', function() {
-    const selectedRadio = document.querySelector('input[name="pattern-selection"]:checked');
-    
-    if (selectedRadio) {
-      const patternId = selectedRadio.value;
-      console.log('[AutoSense Content] User selected pattern:', patternId);
-      
-      try {
-        chrome.runtime.sendMessage({
-          type: 'APPROVE_AUTOMATION',
-          patternId: patternId
-        }, function(response) {
-          if (!chrome.runtime.lastError) {
-            showSuccessMessage('✅ Automation created successfully!');
-          }
-        });
-      } catch (err) {
-        console.log('[AutoSense Content] Send message error:', err);
-      }
-    }
-    
-    overlay.remove();
-  });
-  
-  document.getElementById('autosense-multi-dismiss-btn').addEventListener('click', function() {
-    console.log('[AutoSense Content] User dismissed all patterns');
-    
-    patterns.forEach(pattern => {
-      try {
-        chrome.runtime.sendMessage({
-          type: 'DISMISS_PATTERN',
-          patternId: pattern.id
-        });
-      } catch (err) {
-        console.log('[AutoSense Content] Send message error:', err);
-      }
-    });
-    
-    overlay.remove();
-  });
-  
-  overlay.querySelector('.autosense-overlay').addEventListener('click', function(e) {
-    if (e.target.classList.contains('autosense-overlay')) {
-      overlay.remove();
-    }
-  });
 }
 
-// Show automation selection dialog (RUNTIME - when opening trigger tab)
-function showAutomationSelectionDialog(triggerDomain, automations) {
-  console.log('[AutoSense Content] Creating automation selection dialog');
-  console.log('[AutoSense Content] Trigger:', triggerDomain);
-  console.log('[AutoSense Content] Automations:', automations);
-  
-  const existingDialog = document.getElementById('autosense-confirmation-dialog');
-  if (existingDialog) {
-    existingDialog.remove();
-  }
-  
-  const overlay = document.createElement('div');
-  overlay.id = 'autosense-confirmation-dialog';
-  
-  const automationOptionsHTML = automations.map((automation, index) => `
-    <label class="automation-option" for="automation-${index}">
-      <input type="radio" name="automation-selection" id="automation-${index}" value="${escapeHTML(automation.id)}" ${index === 0 ? 'checked' : ''}>
-      <div class="automation-option-content">
-        <div class="automation-option-header">
-          <span class="automation-option-domain">🌐 ${escapeHTML(automation.action.domain)}</span>
-        </div>
-        <div class="automation-option-desc">Open ${escapeHTML(automation.action.domain)} automatically</div>
-      </div>
-    </label>
-  `).join('');
-  
-  overlay.innerHTML = `
-    <div class="autosense-overlay">
-      <div class="autosense-dialog autosense-dialog-large">
-        <div class="autosense-header">
-          <div class="autosense-icon">⚡</div>
-          <h2>Choose Automation to Execute</h2>
-        </div>
-        
-        <div class="autosense-content">
-          <p class="autosense-description">
-            You have multiple automations for <strong>${escapeHTML(triggerDomain)}</strong>.
-            <br>Which site would you like to open?
-          </p>
-          
-          <div class="pattern-options">
-            ${automationOptionsHTML}
-          </div>
-          
-          <div class="pattern-options-note">
-            💡 <strong>Tip:</strong> You can manage automations from the dashboard!
-          </div>
-        </div>
-        
-        <div class="autosense-actions">
-          <button class="autosense-btn autosense-btn-primary" id="autosense-execute-automation-btn">
-            ✓ Open Selected
-          </button>
-          <button class="autosense-btn autosense-btn-secondary" id="autosense-cancel-automation-btn">
-            ✗ Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
-  
-  const style = document.createElement('style');
-  style.textContent = getDialogStyles();
-  overlay.appendChild(style);
-  document.body.appendChild(overlay);
-  
-  console.log('[AutoSense Content] Automation selection dialog added to DOM');
-  
-  document.getElementById('autosense-execute-automation-btn').addEventListener('click', function() {
-    const selectedRadio = document.querySelector('input[name="automation-selection"]:checked');
-    
-    if (selectedRadio) {
-      const automationId = selectedRadio.value;
-      console.log('[AutoSense Content] User selected automation:', automationId);
-      
-      try {
-        chrome.runtime.sendMessage({
-          type: 'EXECUTE_AUTOMATION',
-          automationId: automationId
-        }, function(response) {
-          if (!chrome.runtime.lastError) {
-            console.log('[AutoSense Content] Automation executed');
-            showSuccessMessage('✅ Opening selected site...');
-          }
-        });
-      } catch (err) {
-        console.log('[AutoSense Content] Send message error:', err);
-      }
-    }
-    
-    overlay.remove();
-  });
-  
-  document.getElementById('autosense-cancel-automation-btn').addEventListener('click', function() {
-    console.log('[AutoSense Content] User cancelled automation selection');
-    overlay.remove();
-  });
-  
-  overlay.querySelector('.autosense-overlay').addEventListener('click', function(e) {
-    if (e.target.classList.contains('autosense-overlay')) {
-      overlay.remove();
-    }
-  });
-}
-
-// Get dialog styles
-function getDialogStyles() {
-  return `
-    .autosense-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.7);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 999999999;
-      animation: autosense-fadeIn 0.3s ease;
-    }
-    
-    @keyframes autosense-fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-    
-    .autosense-dialog {
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-      max-width: 500px;
-      width: 90%;
-      animation: autosense-slideUp 0.3s ease;
-      overflow: hidden;
-    }
-    
-    .autosense-dialog-large {
-      max-width: 600px;
-    }
-    
-    @keyframes autosense-slideUp {
-      from { transform: translateY(30px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-    
-    .autosense-header {
-      background: linear-gradient(135deg, #667eea, #764ba2);
-      color: white;
-      padding: 24px;
-      display: flex;
-      align-items: center;
-      gap: 16px;
-    }
-    
-    .autosense-icon {
-      font-size: 48px;
-    }
-    
-    .autosense-header h2 {
-      margin: 0;
-      font-size: 24px;
-      font-weight: 700;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-    }
-    
-    .autosense-content {
-      padding: 24px;
-    }
-    
-    .autosense-badge {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-    
-    .autosense-badge span {
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 700;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-    }
-    
-    .confidence {
-      background: linear-gradient(135deg, #4caf50, #45a049);
-      color: white;
-    }
-    
-    .occurrences {
-      background: #e3f2fd;
-      color: #1976d2;
-    }
-    
-    .autosense-description {
-      font-size: 16px;
-      color: #333;
-      line-height: 1.6;
-      margin-bottom: 20px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-    }
-    
-    .autosense-flow {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 16px;
-      padding: 16px;
-      background: #f9f9f9;
-      border-radius: 12px;
-      margin-bottom: 20px;
-    }
-    
-    .flow-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 16px;
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    }
-    
-    .flow-icon {
-      font-size: 20px;
-    }
-    
-    .flow-text {
-      font-family: 'Courier New', monospace;
-      font-weight: 600;
-      color: #667eea;
-      font-size: 14px;
-    }
-    
-    .flow-arrow {
-      font-size: 24px;
-      color: #667eea;
-      font-weight: bold;
-    }
-    
-    .autosense-question {
-      font-size: 16px;
-      font-weight: 600;
-      color: #555;
-      text-align: center;
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-    }
-    
-    .autosense-actions {
-      padding: 20px 24px;
-      background: #f9f9f9;
-      display: flex;
-      gap: 12px;
-    }
-    
-    .autosense-btn {
-      flex: 1;
-      padding: 14px 24px;
-      border: none;
-      border-radius: 8px;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-    }
-    
-    .autosense-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    }
-    
-    .autosense-btn-primary {
-      background: linear-gradient(135deg, #4caf50, #45a049);
-      color: white;
-    }
-    
-    .autosense-btn-secondary {
-      background: #e0e0e0;
-      color: #666;
-    }
-    
-    .autosense-btn-secondary:hover {
-      background: #d0d0d0;
-      color: #333;
-    }
-    
-    .pattern-options {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      margin: 20px 0;
-      max-height: 400px;
-      overflow-y: auto;
-    }
-    
-    .pattern-option, .automation-option {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      padding: 16px;
-      border: 2px solid #e0e0e0;
-      border-radius: 12px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      background: white;
-    }
-    
-    .pattern-option:hover, .automation-option:hover {
-      border-color: #667eea;
-      background: #f9f9ff;
-      transform: translateX(4px);
-    }
-    
-    .pattern-option input[type="radio"], .automation-option input[type="radio"] {
-      margin-top: 4px;
-      width: 20px;
-      height: 20px;
-      cursor: pointer;
-      accent-color: #667eea;
-    }
-    
-    .pattern-option-content, .automation-option-content {
-      flex: 1;
-    }
-    
-    .pattern-option-header, .automation-option-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-    }
-    
-    .pattern-option-domain, .automation-option-domain {
-      font-size: 18px;
-      font-weight: 700;
-      font-family: 'Courier New', monospace;
-      color: #667eea;
-    }
-    
-    .pattern-option-badge {
-      padding: 4px 10px;
-      background: #e3f2fd;
-      color: #1976d2;
-      border-radius: 12px;
-      font-size: 11px;
-      font-weight: 700;
-    }
-    
-    .pattern-option-desc, .automation-option-desc {
-      font-size: 14px;
-      color: #666;
-      line-height: 1.5;
-    }
-    
-    .pattern-options-note {
-      padding: 12px 16px;
-      background: #fff8e1;
-      border-left: 4px solid #ffc107;
-      border-radius: 8px;
-      font-size: 13px;
-      color: #666;
-      line-height: 1.6;
-    }
-    
-    .pattern-options-note strong {
-      color: #f57c00;
-    }
-  `;
-}
-
-// Show success message
 function showSuccessMessage(message) {
   const toast = document.createElement('div');
   toast.style.cssText = `
     position: fixed;
     top: 20px;
     right: 20px;
-    background: linear-gradient(135deg, #4caf50, #45a049);
+    background: #4CAF50;
     color: white;
     padding: 16px 24px;
     border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    z-index: 999999999;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    z-index: 2147483648;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
     font-size: 14px;
     font-weight: 600;
-    animation: autosense-slideIn 0.3s ease;
+    animation: slideIn 0.3s ease;
   `;
   toast.textContent = message;
-  
   document.body.appendChild(toast);
   
-  setTimeout(function() {
-    toast.style.opacity = '0';
-    toast.style.transition = 'opacity 0.3s ease';
-    setTimeout(function() {
-      toast.remove();
-    }, 300);
-  }, 3000);
+  setTimeout(() => {
+    toast.style.animation = 'slideOut 0.3s ease';
+    setTimeout(() => toast.remove(), 300);
+  }, 2000);
 }
 
-// Helper function
-function escapeHTML(str) {
-  if (!str) return '';
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
+// ===== DIALOG STYLES =====
+
+function getDialogStyles() {
+  return `
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    @keyframes slideUp {
+      from { transform: translateY(30px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    
+    @keyframes slideIn {
+      from { transform: translateX(400px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    
+    @keyframes slideOut {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(400px); opacity: 0; }
+    }
+    
+    .autosense-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2147483647;
+      animation: fadeIn 0.3s ease;
+    }
+    
+    .autosense-dialog {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+    
+    .autosense-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 24px;
+      border-radius: 16px 16px 0 0;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    
+    .autosense-header-warning {
+      background: linear-gradient(135deg, #ff9800, #f57c00);
+    }
+    
+    .autosense-icon {
+      font-size: 48px;
+      line-height: 1;
+    }
+    
+    .autosense-header-text h2 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    
+    .autosense-subtitle {
+      margin: 4px 0 0 0;
+      font-size: 14px;
+      opacity: 0.9;
+      font-weight: 400;
+    }
+    
+    .autosense-content {
+      padding: 24px;
+    }
+    
+    .autosense-description {
+      font-size: 16px;
+      line-height: 1.6;
+      color: #333;
+      margin-bottom: 20px;
+    }
+    
+    .pattern-flow {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px;
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      border-radius: 12px;
+      margin: 16px 0;
+      font-weight: 600;
+      flex-wrap: wrap;
+    }
+    
+    .pattern-domain {
+      padding: 8px 16px;
+      background: white;
+      border-radius: 8px;
+      color: #667eea;
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .pattern-arrow {
+      font-size: 20px;
+      color: #667eea;
+      font-weight: bold;
+    }
+    
+    .pattern-stats {
+      display: flex;
+      gap: 16px;
+      margin: 16px 0;
+      flex-wrap: wrap;
+    }
+    
+    .stat-item {
+      flex: 1;
+      min-width: 120px;
+      padding: 12px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      text-align: center;
+    }
+    
+    .stat-value {
+      display: block;
+      font-size: 24px;
+      font-weight: 700;
+      color: #667eea;
+      margin-bottom: 4px;
+    }
+    
+    .stat-label {
+      display: block;
+      font-size: 12px;
+      color: #666;
+      font-weight: 500;
+    }
+    
+    .pattern-options-note {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      background: #e3f2fd;
+      border-left: 4px solid #2196f3;
+      border-radius: 8px;
+      margin-top: 16px;
+      font-size: 14px;
+      color: #1976d2;
+    }
+    
+    .note-icon {
+      font-size: 20px;
+    }
+    
+    .autosense-actions {
+      display: flex;
+      gap: 12px;
+      padding: 20px 24px;
+      background: #f8f9fa;
+      border-radius: 0 0 16px 16px;
+    }
+    
+    .autosense-btn {
+      flex: 1;
+      padding: 14px 24px;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    
+    .autosense-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    }
+    
+    .autosense-btn:active {
+      transform: translateY(0);
+    }
+    
+    .autosense-btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+    
+    .autosense-btn-secondary {
+      background: white;
+      color: #666;
+      border: 2px solid #ddd;
+    }
+    
+    .autosense-btn-danger {
+      background: #f44336;
+      color: white;
+    }
+    
+    .btn-icon {
+      font-size: 18px;
+    }
+    
+    .related-tabs-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin: 20px 0;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    
+    .related-tab-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: #f5f5f5;
+      border-radius: 10px;
+      border-left: 4px solid #ff9800;
+    }
+    
+    .tab-icon {
+      font-size: 20px;
+    }
+    
+    .tab-domain {
+      flex: 1;
+      font-family: 'Courier New', monospace;
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+    }
+    
+    .multi-tab-badge {
+      padding: 4px 10px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-left: 8px;
+    }
+  `;
 }
+
+// ===== SHOW PATTERN CONFIRMATION DIALOG =====
+
+function showConfirmationDialog(pattern) {
+  console.log('[AutoSense Content] Showing pattern confirmation dialog');
+  console.log('[AutoSense Content] Pattern:', pattern);
+  
+  removeExistingDialog();
+  
+  const overlay = document.createElement('div');
+  overlay.id = 'autosense-confirmation-dialog';
+  
+  const confidence = parseFloat(pattern.confidence) * 100;
+  
+  // 🆕 Handle multi-tab patterns
+  const domains = pattern.domains || [pattern.suggestedAutomation.trigger.domain, pattern.suggestedAutomation.action.domain];
+  const isMultiTab = domains.length > 2;
+  
+  const flowHTML = domains.map((domain, index) => {
+    if (index === 0) {
+      return `<span class="pattern-domain">${escapeHTML(domain)}</span>`;
+    } else {
+      return `<span class="pattern-arrow">→</span><span class="pattern-domain">${escapeHTML(domain)}</span>`;
+    }
+  }).join('');
+  
+  overlay.innerHTML = `
+    <div class="autosense-overlay">
+      <div class="autosense-dialog">
+        <div class="autosense-header">
+          <div class="autosense-icon">🎯</div>
+          <div class="autosense-header-text">
+            <h2>Pattern Detected!</h2>
+            <p class="autosense-subtitle">AutoSense found a repeated browsing pattern ${isMultiTab ? '<span class="multi-tab-badge">Multi-Tab</span>' : ''}</p>
+          </div>
+        </div>
+        
+        <div class="autosense-content">
+          <p class="autosense-description">
+            ${escapeHTML(pattern.description)}
+          </p>
+          
+          <div class="pattern-flow">
+            ${flowHTML}
+          </div>
+          
+          <div class="pattern-stats">
+            <div class="stat-item">
+              <span class="stat-value">${pattern.occurrences}</span>
+              <span class="stat-label">Times Detected</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-value">${confidence.toFixed(0)}%</span>
+              <span class="stat-label">Confidence</span>
+            </div>
+          </div>
+          
+          <div class="pattern-options-note">
+            <span class="note-icon">💡</span>
+            <span><strong>Automate this?</strong> ${isMultiTab ? 'All these sites' : 'This site'} will open automatically next time.</span>
+          </div>
+        </div>
+        
+        <div class="autosense-actions">
+          <button class="autosense-btn autosense-btn-primary" id="autosense-approve-btn">
+            <span class="btn-icon">✓</span>
+            <span>Yes, Automate</span>
+          </button>
+          <button class="autosense-btn autosense-btn-secondary" id="autosense-dismiss-btn">
+            <span class="btn-icon">✗</span>
+            <span>No Thanks</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  const style = document.createElement('style');
+  style.textContent = getDialogStyles();
+  overlay.appendChild(style);
+  
+  document.body.appendChild(overlay);
+  
+  // Event listeners
+  document.getElementById('autosense-approve-btn')?.addEventListener('click', function() {
+    console.log('[AutoSense Content] User approved pattern:', pattern.id);
+    
+    chrome.runtime.sendMessage({
+      type: 'APPROVE_AUTOMATION',
+      patternId: pattern.id
+    }, function(response) {
+      if (!chrome.runtime.lastError && response.success) {
+        console.log('[AutoSense Content] Automation approved successfully');
+        showSuccessMessage('✅ Automation created!');
+      } else {
+        console.error('[AutoSense Content] Failed to approve:', chrome.runtime.lastError || response);
+      }
+    });
+    
+    overlay.remove();
+  });
+  
+  document.getElementById('autosense-dismiss-btn')?.addEventListener('click', function() {
+    console.log('[AutoSense Content] User dismissed pattern:', pattern.id);
+    
+    chrome.runtime.sendMessage({
+      type: 'DISMISS_PATTERN',
+      patternId: pattern.id
+    }, function(response) {
+      if (!chrome.runtime.lastError && response.success) {
+        console.log('[AutoSense Content] Pattern dismissed successfully');
+      }
+    });
+    
+    overlay.remove();
+  });
+  
+  overlay.querySelector('.autosense-overlay')?.addEventListener('click', function(e) {
+    if (e.target.classList.contains('autosense-overlay')) {
+      overlay.remove();
+    }
+  });
+  
+  setTimeout(() => {
+    overlay.querySelector('.autosense-dialog')?.classList.add('show');
+  }, 10);
+}
+
+// ===== SHOW MULTI-PATTERN SELECTION DIALOG =====
+
+function showMultiPatternDialog(triggerDomain, patterns) {
+  console.log('[AutoSense Content] Showing multi-pattern selection');
+  console.log('[AutoSense Content] Trigger:', triggerDomain, 'Patterns:', patterns.length);
+  
+  removeExistingDialog();
+  
+  const overlay = document.createElement('div');
+  overlay.id = 'autosense-confirmation-dialog';
+  
+  const patternsList = patterns.map((pattern, index) => `
+    <div class="pattern-option" data-pattern-id="${pattern.id}" style="
+      padding: 16px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-bottom: 12px;
+    " onmouseover="this.style.borderColor='#667eea'; this.style.background='#f0f4ff';" onmouseout="this.style.borderColor='transparent'; this.style.background='#f8f9fa';">
+      <div style="font-weight: 600; color: #333; margin-bottom: 8px;">
+        ${escapeHTML(pattern.description)}
+      </div>
+      <div style="font-size: 12px; color: #666;">
+        <span>Detected ${pattern.occurrences} times</span> • 
+        <span>${(parseFloat(pattern.confidence) * 100).toFixed(0)}% confidence</span>
+        ${pattern.isMultiTab ? ' • <span class="multi-tab-badge">Multi-Tab</span>' : ''}
+      </div>
+    </div>
+  `).join('');
+  
+  overlay.innerHTML = `
+    <div class="autosense-overlay">
+      <div class="autosense-dialog">
+        <div class="autosense-header">
+          <div class="autosense-icon">🎯</div>
+          <div class="autosense-header-text">
+            <h2>Multiple Patterns Found</h2>
+            <p class="autosense-subtitle">Choose which pattern to automate</p>
+          </div>
+        </div>
+        
+        <div class="autosense-content">
+          <p class="autosense-description">
+            We found ${patterns.length} different patterns starting from <strong>${escapeHTML(triggerDomain)}</strong>. Which one would you like to automate?
+          </p>
+          
+          <div id="patterns-selection">
+            ${patternsList}
+          </div>
+          
+          <div class="pattern-options-note">
+            <span class="note-icon">💡</span>
+            <span><strong>Tip:</strong> Click on a pattern to create an automation.</span>
+          </div>
+        </div>
+        
+        <div class="autosense-actions">
+          <button class="autosense-btn autosense-btn-secondary" id="autosense-dismiss-all-btn">
+            <span class="btn-icon">✗</span>
+            <span>Dismiss All</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  const style = document.createElement('style');
+  style.textContent = getDialogStyles();
+  overlay.appendChild(style);
+  
+  document.body.appendChild(overlay);
+  
+  // Event listeners for pattern selection
+  overlay.querySelectorAll('.pattern-option').forEach(option => {
+    option.addEventListener('click', function() {
+      const patternId = this.dataset.patternId;
+      console.log('[AutoSense Content] User selected pattern:', patternId);
+      
+      chrome.runtime.sendMessage({
+        type: 'APPROVE_AUTOMATION',
+        patternId: patternId
+      }, function(response) {
+        if (!chrome.runtime.lastError && response.success) {
+          showSuccessMessage('✅ Automation created!');
+        }
+      });
+      
+      overlay.remove();
+    });
+  });
+  
+  document.getElementById('autosense-dismiss-all-btn')?.addEventListener('click', function() {
+    console.log('[AutoSense Content] User dismissed all patterns');
+    
+    patterns.forEach(pattern => {
+      chrome.runtime.sendMessage({
+        type: 'DISMISS_PATTERN',
+        patternId: pattern.id
+      });
+    });
+    
+    overlay.remove();
+  });
+  
+  overlay.querySelector('.autosense-overlay')?.addEventListener('click', function(e) {
+    if (e.target.classList.contains('autosense-overlay')) {
+      overlay.remove();
+    }
+  });
+}
+
+// ===== SHOW AUTOMATION SELECTION DIALOG =====
+
+function showAutomationSelectionDialog(triggerDomain, automations) {
+  console.log('[AutoSense Content] Showing automation selection');
+  
+  removeExistingDialog();
+  
+  const overlay = document.createElement('div');
+  overlay.id = 'autosense-confirmation-dialog';
+  
+  const automationsList = automations.map(automation => {
+    const actionDomains = automation.actions 
+      ? automation.actions.map(a => a.domain).join(', ')
+      : automation.action.domain;
+    
+    return `
+      <div class="automation-option" data-automation-id="${automation.id}" style="
+        padding: 16px;
+        background: #f8f9fa;
+        border-radius: 10px;
+        border: 2px solid transparent;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        margin-bottom: 12px;
+      " onmouseover="this.style.borderColor='#667eea'; this.style.background='#f0f4ff';" onmouseout="this.style.borderColor='transparent'; this.style.background='#f8f9fa';">
+        <div style="font-weight: 600; color: #333; margin-bottom: 8px;">
+          Open: ${escapeHTML(actionDomains)}
+        </div>
+        <div style="font-size: 12px; color: #666;">
+          Executed ${automation.executionCount || 0} times
+          ${automation.isMultiTab ? ' • <span class="multi-tab-badge">Multi-Tab</span>' : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  overlay.innerHTML = `
+    <div class="autosense-overlay">
+      <div class="autosense-dialog">
+        <div class="autosense-header">
+          <div class="autosense-icon">🚀</div>
+          <div class="autosense-header-text">
+            <h2>Multiple Automations</h2>
+            <p class="autosense-subtitle">Choose which automation to execute</p>
+          </div>
+        </div>
+        
+        <div class="autosense-content">
+          <p class="autosense-description">
+            You have multiple automations for <strong>${escapeHTML(triggerDomain)}</strong>. Which one would you like to execute?
+          </p>
+          
+          <div id="automations-selection">
+            ${automationsList}
+          </div>
+        </div>
+        
+        <div class="autosense-actions">
+          <button class="autosense-btn autosense-btn-secondary" id="autosense-cancel-btn">
+            <span class="btn-icon">✗</span>
+            <span>Cancel</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  const style = document.createElement('style');
+  style.textContent = getDialogStyles();
+  overlay.appendChild(style);
+  
+  document.body.appendChild(overlay);
+  
+  // Event listeners
+  overlay.querySelectorAll('.automation-option').forEach(option => {
+    option.addEventListener('click', function() {
+      const automationId = this.dataset.automationId;
+      console.log('[AutoSense Content] User selected automation:', automationId);
+      
+      chrome.runtime.sendMessage({
+        type: 'EXECUTE_AUTOMATION',
+        automationId: automationId
+      }, function(response) {
+        if (!chrome.runtime.lastError && response.success) {
+          showSuccessMessage('✅ Automation executed!');
+        }
+      });
+      
+      overlay.remove();
+    });
+  });
+  
+  document.getElementById('autosense-cancel-btn')?.addEventListener('click', function() {
+    overlay.remove();
+  });
+  
+  overlay.querySelector('.autosense-overlay')?.addEventListener('click', function(e) {
+    if (e.target.classList.contains('autosense-overlay')) {
+      overlay.remove();
+    }
+  });
+}
+
+// 🆕 SHOW CLOSE RELATED TABS DIALOG
+function showCloseRelatedTabsDialog(relatedTabs) {
+  console.log('[AutoSense Content] ===== SHOWING CLOSE RELATED TABS DIALOG =====');
+  console.log('[AutoSense Content] Related tabs:', relatedTabs);
+  
+  removeExistingDialog();
+  
+  const overlay = document.createElement('div');
+  overlay.id = 'autosense-confirmation-dialog';
+  
+  const tabsList = relatedTabs.map((tab, index) => `
+    <div class="related-tab-item">
+      <span class="tab-icon">🌐</span>
+      <span class="tab-domain">${escapeHTML(tab.domain)}</span>
+    </div>
+  `).join('');
+  
+  overlay.innerHTML = `
+    <div class="autosense-overlay">
+      <div class="autosense-dialog">
+        <div class="autosense-header autosense-header-warning">
+          <div class="autosense-icon">⚠️</div>
+          <div class="autosense-header-text">
+            <h2>Close Related Tabs?</h2>
+            <p class="autosense-subtitle">These tabs were opened by automation</p>
+          </div>
+        </div>
+        
+        <div class="autosense-content">
+          <p class="autosense-description">
+            You closed the trigger tab. Would you like to close the related automated tabs as well?
+          </p>
+          
+          <div class="related-tabs-list">
+            ${tabsList}
+          </div>
+          
+          <div class="pattern-options-note">
+            <span class="note-icon">💡</span>
+            <span><strong>Tip:</strong> This helps keep your tabs organized!</span>
+          </div>
+        </div>
+        
+        <div class="autosense-actions">
+          <button class="autosense-btn autosense-btn-primary" id="autosense-close-tabs-btn">
+            <span class="btn-icon">✓</span>
+            <span>Yes, Close All</span>
+          </button>
+          <button class="autosense-btn autosense-btn-secondary" id="autosense-keep-tabs-btn">
+            <span class="btn-icon">✗</span>
+            <span>No, Keep Them</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  const style = document.createElement('style');
+  style.textContent = getDialogStyles();
+  overlay.appendChild(style);
+  
+  document.body.appendChild(overlay);
+  
+  console.log('[AutoSense Content] Dialog HTML added to DOM');
+  
+  // Event listeners
+  document.getElementById('autosense-close-tabs-btn')?.addEventListener('click', function() {
+    console.log('[AutoSense Content] User chose to close related tabs');
+    
+    const tabIds = relatedTabs.map(t => t.tabId);
+    
+    chrome.runtime.sendMessage({
+      type: 'CLOSE_RELATED_TABS',
+      tabIds: tabIds
+    }, function(response) {
+      if (!chrome.runtime.lastError && response && response.success) {
+        console.log('[AutoSense Content] Related tabs closed successfully');
+        showSuccessMessage('✅ Related tabs closed');
+      } else {
+        console.error('[AutoSense Content] Error:', chrome.runtime.lastError || response);
+      }
+    });
+    
+    overlay.remove();
+  });
+  
+  document.getElementById('autosense-keep-tabs-btn')?.addEventListener('click', function() {
+    console.log('[AutoSense Content] User chose to keep related tabs');
+    overlay.remove();
+  });
+  
+  overlay.querySelector('.autosense-overlay')?.addEventListener('click', function(e) {
+    if (e.target.classList.contains('autosense-overlay')) {
+      overlay.remove();
+    }
+  });
+  
+  setTimeout(() => {
+    overlay.querySelector('.autosense-dialog')?.classList.add('show');
+  }, 10);
+  
+  console.log('[AutoSense Content] Event listeners attached');
+}
+
+// ===== MESSAGE LISTENER =====
+
+// Remove old listener if exists
+try {
+  chrome.runtime.onMessage.removeListener(arguments.callee);
+} catch (e) {
+  // Ignore
+}
+
+// Add message listener
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log('[AutoSense Content] ===== MESSAGE RECEIVED =====');
+  console.log('[AutoSense Content] Type:', message.type);
+  console.log('[AutoSense Content] Full message:', message);
+  
+  try {
+    if (message.type === 'SHOW_PATTERN_CONFIRMATION') {
+      console.log('[AutoSense Content] Showing pattern confirmation');
+      showConfirmationDialog(message.pattern);
+      sendResponse({ success: true });
+    } 
+    else if (message.type === 'SHOW_MULTI_PATTERN_SELECTION') {
+      console.log('[AutoSense Content] Showing multi-pattern selection');
+      showMultiPatternDialog(message.triggerDomain, message.patterns);
+      sendResponse({ success: true });
+    } 
+    else if (message.type === 'SHOW_AUTOMATION_SELECTION') {
+      console.log('[AutoSense Content] Showing automation selection');
+      showAutomationSelectionDialog(message.triggerDomain, message.automations);
+      sendResponse({ success: true });
+    } 
+    else if (message.type === 'SHOW_CLOSE_RELATED_TABS') {
+      console.log('[AutoSense Content] Showing close related tabs dialog');
+      console.log('[AutoSense Content] Related tabs:', message.relatedTabs);
+      showCloseRelatedTabsDialog(message.relatedTabs);
+      sendResponse({ success: true });
+    }
+    else {
+      console.log('[AutoSense Content] Unknown message type:', message.type);
+      sendResponse({ success: false, error: 'Unknown message type' });
+    }
+  } catch (error) {
+    console.error('[AutoSense Content] Error handling message:', error);
+    sendResponse({ success: false, error: error.message });
+  }
+  
+  return true; // Keep channel open for async response
+});
+
+console.log('[AutoSense Content] ===== MESSAGE LISTENER REGISTERED =====');
+console.log('[AutoSense Content] Ready to receive messages! 🎧');
