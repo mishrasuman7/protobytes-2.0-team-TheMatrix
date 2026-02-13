@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoSense Dashboard</title>
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-left">
+        <div class="header-icon">🤖</div>
+        <div class="header-content">
+          <h1>AutoSense Dashboard</h1>
+          <p class="header-subtitle">Intelligent Behavior-Driven Automation</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="header-btn btn-secondary" id="refresh-btn">
+          🔄 Refresh
+        </button>
+        <button class="header-btn btn-primary" id="settings-btn">
+          ⚙️ Settings
+        </button>
+      </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">📊</div>
+        <div class="stat-info">
+          <div class="stat-label">Events Tracked</div>
+          <div class="stat-value" id="events-count">0</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon">🔍</div>
+        <div class="stat-info">
+          <div class="stat-label">Patterns Detected</div>
+          <div class="stat-value" id="patterns-count">0</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon">⚡</div>
+        <div class="stat-info">
+          <div class="stat-label">Active Automations</div>
+          <div class="stat-value" id="automations-count">0</div>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon">💾</div>
+        <div class="stat-info">
+          <div class="stat-label">Storage Used</div>
+          <div class="stat-value" id="storage-size">0 KB</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Browsing History Section -->
+    <div class="section full-width">
+      <div class="section-header">
+        <div class="section-title">
+          <span class="section-icon">📜</span>
+          Browsing History
+        </div>
+        <div class="history-controls">
+          <select class="filter-select" id="history-filter">
+            <option value="all">All Events</option>
+            <option value="tab_updated">Page Visits</option>
+            <option value="tab_activated">Tab Switches</option>
+            <option value="tab_created">New Tabs</option>
+          </select>
+          <button class="header-btn btn-secondary" id="clear-history-btn">
+            🗑️ Clear History
+          </button>
+        </div>
+      </div>
+      <div id="history-list" class="history-list">
+        <p class="loading">Loading history...</p>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="content">
+      <!-- Detected Patterns -->
+      <div class="section">
+        <div class="section-header">
+          <div class="section-title">
+            <span class="section-icon">🔍</span>
+            Detected Patterns
+          </div>
+          <select class="filter-select" id="pattern-filter">
+            <option value="all">All Patterns</option>
+            <option value="high">High Confidence</option>
+            <option value="medium">Medium Confidence</option>
+            <option value="low">Low Confidence</option>
+          </select>
+        </div>
+        <div id="patterns-list">
+          <div class="empty-state">
+            <p class="empty-text">Loading patterns...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Automations -->
+      <div class="section">
+        <div class="section-header">
+          <div class="section-title">
+            <span class="section-icon">⚡</span>
+            Active Automations
+          </div>
+          <button class="header-btn btn-primary" id="add-manual-btn">
+            + Add Manual
+          </button>
+        </div>
+        <div id="automations-list">
+          <div class="empty-state">
+            <p class="empty-text">Loading automations...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>
