@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoSense Control Panel</title>
+  <link rel="stylesheet" href="sidepanel.css">
+</head>
+<body>
+  <div class="sidepanel-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-top">
+        <div class="logo">
+          <span class="logo-icon">🤖</span>
+          <div class="logo-text">
+            <h1>AutoSense</h1>
+            <p>Smart Tab Automation</p>
+          </div>
+        </div>
+        <button class="theme-toggle" id="theme-toggle" title="Toggle Dark Mode">
+          <span class="theme-icon">🌙</span>
+        </button>
+      </div>
+
+      <!-- Search Bar -->
+      <div class="search-container">
+        <input 
+          type="text" 
+          class="search-input" 
+          id="search-input" 
+          placeholder="Search automations, patterns, domains..."
+        >
+        <span class="search-icon">🔍</span>
+      </div>
+
+      <!-- Stats Grid -->
+      <div class="stats-grid">
+        <div class="stat-item">
+          <span class="stat-icon">⚡</span>
+          <div class="stat-info">
+            <span class="stat-value" id="stat-automations">0</span>
+            <span class="stat-label">Active</span>
+          </div>
+        </div>
+        <div class="stat-item">
+          <span class="stat-icon">🎯</span>
+          <div class="stat-info">
+            <span class="stat-value" id="stat-executions">0</span>
+            <span class="stat-label">Executed</span>
+          </div>
+        </div>
+        <div class="stat-item">
+          <span class="stat-icon">🔍</span>
+          <div class="stat-info">
+            <span class="stat-value" id="stat-patterns">0</span>
+            <span class="stat-label">Patterns</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="nav-tab active" data-tab="automations">
+        <span class="tab-icon">⚡</span>
+        Automations
+      </button>
+      <button class="nav-tab" data-tab="patterns">
+        <span class="tab-icon">🔍</span>
+        Patterns
+      </button>
+      <button class="nav-tab" data-tab="security">
+        <span class="tab-icon">🔒</span>
+        Security
+      </button>
+      <button class="nav-tab" data-tab="settings">
+        <span class="tab-icon">⚙️</span>
+        Settings
+      </button>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      
+      <!-- Automations Tab -->
+      <div class="tab-content active" id="automations-tab">
+        <div class="section-header">
+          <h2>Active Automations</h2>
+          <button class="btn btn-primary" id="add-automation-btn">
+            <span class="btn-icon">➕</span>
+            Add Automation
+          </button>
+        </div>
+
+        <!-- Category Filter -->
+        <div class="filter-bar">
+          <label class="filter-label">Filter by category:</label>
+          <select class="filter-select" id="category-filter">
+            <option value="all">All Categories</option>
+            <option value="WORK">💼 Work</option>
+            <option value="SOCIAL">👥 Social</option>
+            <option value="ENTERTAINMENT">🎬 Entertainment</option>
+            <option value="SHOPPING">🛒 Shopping</option>
+            <option value="NEWS">📰 News</option>
+            <option value="EDUCATION">📚 Education</option>
+            <option value="FINANCE">💰 Finance</option>
+            <option value="HEALTH">🏥 Health</option>
+            <option value="TECH">💻 Tech</option>
+            <option value="OTHER">🔖 Other</option>
+          </select>
+        </div>
+
+        <div class="content-list" id="automations-list">
+          <div class="loading">Loading automations...</div>
+        </div>
+      </div>
+
+      <!-- Patterns Tab -->
+      <div class="tab-content" id="patterns-tab">
+        <div class="section-header">
+          <h2>Detected Patterns</h2>
+          <button class="btn btn-secondary" id="analyze-patterns-btn">
+            <span class="btn-icon">🔄</span>
+            Analyze Now
+          </button>
+        </div>
+
+        <div class="content-list" id="patterns-list">
+          <div class="loading">Loading patterns...</div>
+        </div>
+      </div>
+
+      <!-- Security Tab -->
+      <div class="tab-content" id="security-tab">
+        <div class="section-header">
+          <h2>Security Settings</h2>
+        </div>
+
+        <div class="security-section">
+          <div class="security-card">
+            <div class="security-header">
+              <h3>🔒 Domain Whitelist</h3>
+              <p class="security-desc">Only track patterns from whitelisted domains</p>
+            </div>
+
+            <div class="whitelist-input-group">
+              <input 
+                type="text" 
+                class="input" 
+                id="whitelist-input" 
+                placeholder="e.g., youtube.com"
+              >
+              <button class="btn btn-primary" id="add-whitelist-btn">
+                Add Domain
+              </button>
+            </div>
+
+            <div class="whitelist-list" id="whitelist-list">
+              <div class="loading">Loading whitelist...</div>
+            </div>
+          </div>
+
+          <div class="security-card">
+            <div class="security-header">
+              <h3>⚡ Rate Limiting</h3>
+              <p class="security-desc">Protection against excessive automation</p>
+            </div>
+            <div class="security-info">
+              <div class="info-item">
+                <span class="info-label">Max Events/Minute:</span>
+                <span class="info-value">30</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Max Patterns/Hour:</span>
+                <span class="info-value">10</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Max Automations:</span>
+                <span class="info-value">50</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="security-card">
+            <div class="security-header">
+              <h3>🛡️ Security Features</h3>
+              <p class="security-desc">Active protection mechanisms</p>
+            </div>
+            <div class="security-features">
+              <div class="feature-item">
+                <span class="feature-icon">✅</span>
+                <span class="feature-text">Input Sanitization</span>
+              </div>
+              <div class="feature-item">
+                <span class="feature-icon">✅</span>
+                <span class="feature-text">Content Security Policy</span>
+              </div>
+              <div class="feature-item">
+                <span class="feature-icon">✅</span>
+                <span class="feature-text">Domain Validation</span>
+              </div>
+              <div class="feature-item">
+                <span class="feature-icon">✅</span>
+                <span class="feature-text">Rate Limiting</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings Tab -->
+      <div class="tab-content" id="settings-tab">
+        <div class="section-header">
+          <h2>Settings & Preferences</h2>
+        </div>
+
+        <div class="settings-section">
+          <div class="setting-group">
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Enable Notifications</label>
+                <p class="setting-desc">Show notifications when automations are executed</p>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="setting-notifications" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Auto Execute Automations</label>
+                <p class="setting-desc">Automatically execute automations without confirmation</p>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="setting-auto-execute" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Pattern Detection</label>
+                <p class="setting-desc">Automatically detect browsing patterns</p>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="setting-pattern-detection" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Show Toast Messages</label>
+                <p class="setting-desc">Display toast notifications for actions</p>
+              </div>
+              <label class="toggle-switch">
+                <input type="checkbox" id="setting-show-toasts" checked>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="setting-group">
+            <h3 class="setting-group-title">Data Management</h3>
+            
+            <div class="setting-item">
+              <div class="setting-info">
+                <label class="setting-label">Storage Used</label>
+                <p class="setting-desc" id="storage-used">0 KB / 5 MB</p>
+              </div>
+            </div>
+
+            <div class="setting-actions">
+              <button class="btn btn-secondary" id="export-data-btn">
+                <span class="btn-icon">📥</span>
+                Export Data
+              </button>
+              <button class="btn btn-secondary" id="import-data-btn">
+                <span class="btn-icon">📤</span>
+                Import Data
+              </button>
+              <button class="btn btn-danger" id="clear-all-btn">
+                <span class="btn-icon">🗑️</span>
+                Clear All Data
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-content">
+        <span class="footer-text">AutoSense v2.0</span>
+        <button class="btn btn-link" id="open-dashboard-btn">
+          Open Full Dashboard →
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script type="module" src="sidepanel.js"></script>
+</body>
+</html>
