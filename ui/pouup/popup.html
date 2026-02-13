@@ -1,13 +1,57 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AutoSense</title>
+  <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <h2>AutoSense Running</h2>
-  <h2> hellooooooooooooooooooo </h2>
-  <button id="testBtn">Test</button>
-  <script src="popup.js"></script>
+  <div class="popup-container">
+    <!-- Header -->
+    <div class="popup-header">
+      <div class="header-icon">🤖</div>
+      <div class="header-text">
+        <h1>AutoSense</h1>
+        <p>Smart Tab Automation</p>
+      </div>
+    </div>
 
+    <!-- Quick Stats -->
+    <div class="quick-stats">
+      <div class="stat">
+        <span class="stat-value" id="popup-stat-automations">0</span>
+        <span class="stat-label">Active</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value" id="popup-stat-patterns">0</span>
+        <span class="stat-label">Patterns</span>
+      </div>
+      <div class="stat">
+        <span class="stat-value" id="popup-stat-executions">0</span>
+        <span class="stat-label">Runs</span>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="popup-actions">
+      <button class="popup-btn popup-btn-primary" id="open-sidepanel">
+        <span class="btn-icon">📊</span>
+        <span>Open Side Panel</span>
+      </button>
+      <button class="popup-btn popup-btn-secondary" id="add-quick-automation">
+        <span class="btn-icon">➕</span>
+        <span>Add Automation</span>
+      </button>
+    </div>
+
+    <!-- Footer -->
+    <div class="popup-footer">
+      <span class="footer-text">v2.0.0</span>
+      <button class="footer-link" id="open-full-dashboard">Full Dashboard →</button>
+    </div>
+  </div>
+
+  <script type="module" src="popup.js"></script>
 </body>
 </html>
